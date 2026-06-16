@@ -1,0 +1,196 @@
+一、Seedance 2.0 是什么
+1.1 背景
+字节跳动 旗下的火山引擎在2月份发布了 Seedance 2.0 模型，当时还是限量内测。4月2号在武汉巡展上宣布对企业公测，4月14号终于全面开放，个人开发者也能用了。
+
+说实话这一步我等了挺久了。之前想接入测试得提交企业资质排队，身边好几个朋友排了快一个月都没排上。
+
+1.2 核心能力
+一句话总结：四种东西往里喂，带声音的视频直接出来。
+
+输入模态	支持详情
+文本	自然语言描述场景、动作、镜头
+图片	单次最多 9 张，用作画面参考
+视频	单次最多 3 个，学习运镜和动作
+音频	单次最多 3 个，环境音/背景乐/人声
+四种可以任意组合。比如你扔2张产品照片 + 1段背景乐 + 一句文字描述，它就给你出一个带声音的产品展示视频。
+
+二、API 接入实战
+2.1 注册和开通
+# 1. 注册火山引擎账号
+# 访问 https://www.volcengine.com 注册
+
+# 2. 进入火山方舟（Model ARK）控制台
+# 找到 Seedance 2.0 模型
+
+# 3. 开通服务，获取 API Key
+整个流程大概20分钟就搞定了。不需要企业认证这点确实方便不少。
+
+2.2 基础调用示例
+import requests
+import time
+
+# API配置
+API_KEY = "your-api-key"
+BASE_URL = "https://ark.volcengineapi.com/v1/seedance"
+
+# 文生视频：最简单的调用方式
+def text_to_video(prompt):
+    response = requests.post(
+        f"{BASE_URL}/generate",
+        headers={
+            "Authorization": f"Bearer {API_KEY}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": "seedance-2.0",
+            "prompt": prompt,
+            "duration": 5,  # 秒，最长15
+            "resolution": "1080p",
+            "audio": True  # 开启原生音频
+        }
+    )
+    task_id = response.json()["task_id"]
+    
+    # 轮询等待结果（异步任务）
+    while True:
+        status = requests.get(
+            f"{BASE_URL}/tasks/{task_id}",
+            headers={"Authorization": f"Bearer {API_KEY}"}
+        ).json()
+        
+        if status["state"] == "completed":
+            return status["video_url"]
+        elif status["state"] == "failed":
+            raise Exception(f"生成失败: {status['error']}")
+        
+        time.sleep(5)  # 每5秒查一次
+
+# 调用
+video_url = text_to_video(
+    "一个咖啡师在吧台慢慢倒拿铁拉花，暖色灯光，浅景深特写"
+)
+print(f"视频地址: {video_url}")
+2.3 多模态混合调用
+import base64
+
+def multimodal_generate(prompt, images=None, audios=None):
+    """多模态输入生成视频"""
+    payload = {
+        "model": "seedance-2.0",
+        "prompt": prompt,
+        "duration": 8,
+        "resolution": "1080p",
+        "audio": True,
+        "references": []
+    }
+    
+    # 添加图片参考
+    if images:
+        for img_path in images:
+            with open(img_path, "rb") as f:
+                img_b64 = base64.b64encode(f.read()).decode()
+            payload["references"].append({
+                "type": "image",
+                "data": img_b64
+            })
+    
+    # 添加音频参考
+    if audios:
+        for audio_path in audios:
+            with open(audio_path, "rb") as f:
+                audio_b64 = base64.b64encode(f.read()).decode()
+            payload["references"].append({
+                "type": "audio",
+                "data": audio_b64
+            })
+    
+    response = requests.post(
+        f"{BASE_URL}/generate",
+        headers={
+            "Authorization": f"Bearer {API_KEY}",
+            "Content-Type": "application/json"
+        },
+        json=payload
+    )
+    return response.json()["task_id"]
+
+# 示例：产品照片 + 背景乐 → 产品展示视频
+task_id = multimodal_generate(
+    prompt="产品缓缓旋转展示，镜头从远景推到近景特写",
+    images=["product_front.jpg", "product_side.jpg"],
+    audios=["bgm_tech.mp3"]
+)
+AI写代码
+python
+运行
+这个多模态混合输入是我觉得最有用的部分。以前做产品视频得先拍照、再P图、再拍视频、再配音、再对嘴型——现在素材一股脑丢进去就行。
+
+三、实测效果与性能数据
+3.1 生成质量
+我跑了二十多个不同场景的测试，主观评价：
+
+场景	画质	物理真实度	音画同步	备注
+人物说话	⭐⭐⭐⭐	⭐⭐⭐⭐	⭐⭐⭐⭐⭐	嘴型对得上
+液体倒水	⭐⭐⭐	⭐⭐⭐⭐	—	液面弧度基本对
+产品展示	⭐⭐⭐⭐⭐	⭐⭐⭐⭐	⭐⭐⭐⭐	最佳使用场景
+自然风景	⭐⭐⭐⭐	⭐⭐⭐	⭐⭐⭐	树叶偶尔穿模
+多人互动	⭐⭐⭐	⭐⭐⭐	⭐⭐⭐	人多了容易乱
+3.2 性能和定价
+指标	数据
+最长时长	15秒
+分辨率	最高1080p
+生成速度	5秒视频约30-60秒
+定价	约1元/秒
+音频	双声道立体声
+并发限制	个人账户5并发
+3.3 与竞品对比
+维度	Seedance 2.0	Sora	可灵
+音画同步	原生同步	后期配	后期配
+多模态输入	4种混合	文本+图片	文本+图片
+镜头控制	导演级	基础	中等
+画面质感	好	最佳	好
+角色一致性	中等	中等	强
+API价格	~1元/秒	~2元/秒	~0.8元/秒
+四、踩坑记录
+这里记几个我实际碰到的问题：
+
+坑1：异步任务模式
+API 返回的不是视频，而是一个 task_id。你得自己写轮询逻辑去查状态。第一次不知道这个机制的话可能会卡住——我一开始还以为是接口报错了。
+
+坑2：中文镜头指令偶尔抽风
+我写「镜头向右摇」它给我理解成了旋转360度。后来发现用更具体的描述效果好很多，比如写「镜头从左向右水平移动30度」。
+
+坑3：音频参考格式
+音频参考只支持 MP3 和 WAV，我一开始用 AAC 直接报错了。而且音频时长最好跟你要生成的视频时长匹配，不然它会自动裁剪，效果可能不是你想要得。
+
+坑4：图片参考的分辨率 
+图片太大了会超时。我建议控制在2048px以内，大于这个值得时候API响应明显变慢。
+
+五、适用场景和建议
+最适合的场景
+场景	推荐度	理由
+电商产品视频	⭐⭐⭐⭐⭐	产品照片+描述直接出带声音的展示视频
+短视频封面/片头	⭐⭐⭐⭐⭐	5-10秒刚好够用
+广告创意素材	⭐⭐⭐⭐	多模态参考能快速出不同版本
+教育演示动画	⭐⭐⭐⭐	声画同步做讲解视频很方便
+短剧/长视频	⭐⭐	15秒上限太短了
+使用建议
+文字描述尽量具体——「镜头从左到右平移」比「摇镜」效果稳定
+图片参考别用太大的图——2048px以内最佳
+如果需要声音，优先用音频参考而不是让它自己生成
+批量生产建议用 Python 脚本跑异步任务队列
+六、总结
+Seedance 2.0 API 全面开放这件事，我觉得标志着国内AI视频生成正式进入了"可以拿来干活"的阶段。四模态混合输入和原生音画同步这两个能力，对做电商、短视频、广告素材的团队来说，确实能省掉一大块后期成本。
+
+不过冷静来看，15秒时长限制、中文指令偶尔的理解偏差、以及每秒1元的价格（批量做的话还是有点心疼），都是需要考虑的。
+
+如果你做的是短视频封面、产品展示、广告素材这类 5-15秒的内容，现在就可以接入试试。如果想做更长的叙事内容，可能还得再等等。
+
+🔗 官方文档：https://seed.bytedance.com/zh/seedance2_0
+
+🔗 API接入：火山引擎 → 火山方舟 → Seedance 2.0
+
+
+————————————————
+版权声明：本文为CSDN博主「一粒黑子」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
+原文链接：https://blog.csdn.net/u014354882/article/details/160228383

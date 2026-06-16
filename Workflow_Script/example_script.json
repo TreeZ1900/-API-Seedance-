@@ -1,0 +1,40 @@
+{
+  "project_name": "我的第一个视频",
+  "characters": [
+    {
+      "name": "主角小明",
+      "prompt": "一个穿着蓝色T恤的少年，短发，微笑，动漫风格，全身像",
+      "width": 512,
+      "height": 768
+    },
+    {
+      "name": "小猫咪",
+      "prompt": "一只可爱的橘色小猫，圆圆的眼睛，毛茸茸的，卡通风格",
+      "width": 512,
+      "height": 512
+    }
+  ],
+  "storyboards": [
+    {
+      "scene_id": 1,
+      "prompt": "@主角小明 站在教室门口，阳光透过窗户洒进来，暖色调，电影感",
+      "duration": 5,
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "scene_id": 2,
+      "prompt": "@主角小明 转身走进教室，@小猫咪 在桌子上，镜头从左向右平移30度",
+      "duration": 8,
+      "width": 1024,
+      "height": 576
+    },
+    {
+      "scene_id": 3,
+      "prompt": "@主角小明 走向 @小猫咪，蹲下来轻轻抚摸，镜头推近特写，温馨画面",
+      "duration": 6,
+      "width": 1024,
+      "height": 576
+    }
+  ]
+}
